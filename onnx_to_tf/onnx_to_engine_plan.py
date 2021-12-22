@@ -3,8 +3,8 @@ import argparse
 from onnx import ModelProto
 import tensorrt as trt 
  
-engine_name = "/home/gorkem/Documents/acceleration/models/mobilenet.plan"
-onnx_path = "/home/gorkem/Documents/acceleration/models/mobilenet.onnx"
+onnx_path = "/home/gorkem/Documents/acceleration/onnx_to_tf/models/mobilenet.onnx"
+engine_name = "/home/gorkem/Documents/acceleration/onnx_to_tf/models/mobilenet_float16.plan"
 batch_size = 1 
 
 model = ModelProto()

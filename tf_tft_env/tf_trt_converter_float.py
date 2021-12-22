@@ -2,7 +2,7 @@ from tensorflow.python.compiler.tensorrt import trt_convert as trt
 import numpy as np
 import copy
 
-input_saved_model_dir = "/home/gorkem/Documents/acceleration/tf_tft_env/models/resnet50"
+input_saved_model_dir = "/home/gorkem/Documents/acceleration/tf_tft_env/models/mobilenet"
 
 params = copy.deepcopy(trt.DEFAULT_TRT_CONVERSION_PARAMS)
 precision_mode = trt.TrtPrecisionMode.FP16
@@ -17,5 +17,5 @@ params = params._replace(
 
 converter = trt.TrtGraphConverterV2(input_saved_model_dir, conversion_params=params)
 converter.convert()
-converter.save("/home/gorkem/Documents/acceleration/tf_tft_env/models/tf_trt_resnet50")
+converter.save("/home/gorkem/Documents/acceleration/tf_tft_env/models/tf_trt_mobilenet")
 print("Done ... ")

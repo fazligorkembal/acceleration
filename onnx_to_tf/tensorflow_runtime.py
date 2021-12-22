@@ -7,8 +7,8 @@ from tqdm import tqdm
 import time
 import cv2
 
-model_path = "/home/gorkem/Documents/acceleration/models/mobilenet.h5"
-input_file_path = "/home/gorkem/Documents/acceleration/images/ade20k.jpg"
+model_path = "/home/gorkem/Documents/acceleration/onnx_to_tf/models/mobilenet.h5"
+input_file_path = "/home/gorkem/Documents/acceleration/tf_tft_env/lazy.jpg"
 height = 224
 width = 224
 

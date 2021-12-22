@@ -8,7 +8,7 @@ import time
 import cv2
 from tqdm import tqdm
 
-input_saved_model_path = "/home/gorkem/Documents/acceleration/tf_tft_env/models/tf_trt_resnet50"
+input_saved_model_path = "/home/gorkem/Documents/acceleration/tf_tft_env/models/tf_trt_mobilenet"
 model = tf.saved_model.load(input_saved_model_path, tags=[tag_constants.SERVING])
 signature_keys = list(model.signatures.keys())
 print(signature_keys)
@@ -25,8 +25,8 @@ x = tf.constant(x)
 #x = tf.expand_dims(x, axis=0)
 
 fpses = []
-with tqdm(total=10000) as pbar:
-    for i in range(10000):
+with tqdm(total=100000) as pbar:
+    for i in range(100000):
         start_time = time.time()
         labeling = infer(x)
         fps = 1.0 / (time.time() - start_time)

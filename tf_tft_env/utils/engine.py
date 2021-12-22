@@ -6,12 +6,16 @@ trt_runtime = trt.Runtime(TRT_LOGGER)
 
 def build_engine(onnx_path, shape = [1,300,300,3]):
    with trt.Builder(TRT_LOGGER) as builder, builder.create_network(1) as network, builder.create_builder_config() as config, trt.OnnxParser(network, TRT_LOGGER) as parser:
-       config.max_workspace_size = (256 << 20)
-       with open(onnx_path, 'rb') as model:
+        config.max_workspace_size = 1 << 32
+        print("Has platform fast16", builder.platform_has_fast_fp16)
+        print("Has platform fastINT8", builder.platform_has_fast_int8)
+        
+
+        with open(onnx_path, 'rb') as model:
            parser.parse(model.read())
-       network.get_input(0).shape = shape
-       engine = builder.build_engine(network, config)
-       return engine
+        network.get_input(0).shape = shape
+        engine = builder.build_engine(network, config)
+        return engine
 
 def save_engine(engine, file_name):
    buf = engine.serialize()

@@ -8,17 +8,23 @@ import time
 from tqdm import tqdm
 import cv2
 
-input_file_path = "/home/gorkem/Documents/acceleration/onnx_to_tf/images/ade20k.jpg"
-onnx_file = "/home/gorkem/Documents/acceleration/onnx_to_tf/models/mobilenet.onnx"
+input_file_path = "/home/gorkem/Documents/acceleration/tf_tft_env/lazy.jpg"
 serialized_plan_f32 = "/home/gorkem/Documents/acceleration/onnx_to_tf/models/mobilenet.plan"
 
 height = 224
 width = 224
 
 
-print(dir(trt.Logger))
-TRT_LOGGER = trt.Logger(trt.Logger.VERBOSE)
-trt_runtime = trt.Runtime(TRT_LOGGER)
+class MyLogger(trt.ILogger):
+    def __init__(self):
+       trt.ILogger.__init__(self)
+
+    def log(self, severity, msg):
+        pass # Your custom logging implementation here
+
+#logger = MyLogger()
+logger = trt.Logger(trt.Logger.VERBOSE)
+trt_runtime = trt.Runtime(logger)
 
 
 image = cv2.imread(input_file_path)
@@ -31,14 +37,14 @@ h_input, d_input, h_output, d_output, stream = inf.allocate_buffers(engine, 1, t
 
 fpsses = []
 out = None
-with tqdm(total=1000) as pbar:
-    for i in range(1000):
+with tqdm(total=10000) as pbar:
+    for i in range(10000):
         start_time = time.time()
         out = inf.do_inference(engine, im, h_input, d_input, h_output, d_output, stream, 1, height, width)
         fps = 1/(time.time() - start_time)
         fpsses.append(fps)
         pbar.update(1)
-
+        
 print("AVERAGE FPS: ", np.mean(fpsses))
 if np.argmax(out) == 511:
     print("Predicted: CAR")
