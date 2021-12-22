@@ -16,7 +16,7 @@ def main(saved_model_path=None, onnx_path=None,batch_size=1, input_size=0, exper
     assert onnx_path != None
 
     graph_def, inputs, outputs, tensors_to_rename = tf_loader.from_saved_model(saved_model_path, None, None, "serve", ["serving_default"], return_tensors_to_rename=True)
-    print(tensors_to_rename)
+    print("Tensors to rename: {}".format(tensors_to_rename))
     with tf.Graph().as_default() as tf_graph:
         tf.import_graph_def(graph_def, name="")
     with tf_loader.tf_session(graph=tf_graph):
@@ -31,8 +31,9 @@ def main(saved_model_path=None, onnx_path=None,batch_size=1, input_size=0, exper
     
     # Set the I/O tensor shapes
     graph.inputs[0].shape[0] = batch_size
-    #graph.outputs[0].shape[0] = batch_size
+    graph.outputs[3].shape = [1, 100, 91]
     
+
     if input_size > 0:
         if graph.inputs[0].shape[3] == 3:
             # Format NHWC
@@ -53,10 +54,11 @@ def main(saved_model_path=None, onnx_path=None,batch_size=1, input_size=0, exper
                 sys.exit(1)
     
     #TEST FOR THIS PART ... FOR FLOAT32 and FLOAT16
-    for node in [n for n in graph.nodes if n.op =="Clip"]:
+    # Fix Clip Nodes (ReLU6)
+    for node in [n for n in graph.nodes if n.op == "Clip"]:
         for input in node.inputs[1:]:
-            if experimental_float16_onnx:
-                input.values = np.float32(input.values)
+            # In TensorRT, the min/max inputs on a Clip op *must* have fp32 datatype
+            input.values = np.float32(input.values)
     
     graph.cleanup().toposort()
     model = shape_inference.infer_shapes(gs.export_onnx(graph))
@@ -75,4 +77,4 @@ def main(saved_model_path=None, onnx_path=None,batch_size=1, input_size=0, exper
 if __name__ == "__main__":
     saved_model_path = "/home/gorkem/Downloads/Compressed/ssd_mobilenet_v2_320x320_coco17_tpu-8/saved_model"
     onnx_path = "/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/models/efficientnet_d0_float16.onnx"
-    main(saved_model_path, onnx_path=onnx_path, batch_size=1, input_size=224, experimental_float16_onnx=True)
+    main(saved_model_path, onnx_path=onnx_path, batch_size=1, input_size=224, experimental_float16_onnx=False)
