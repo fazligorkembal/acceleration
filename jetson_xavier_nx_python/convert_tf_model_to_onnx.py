@@ -11,7 +11,7 @@ import tensorflow as tf
 from tf2onnx import tfonnx, optimizer, tf_loader
 from onnxmltools.utils.float16_converter import convert_float_to_float16
 
-def main(saved_model_path=None, onnx_path=None,batch_size=1, input_size=0, experimental_float16_onnx=False):
+def main(saved_model_path=None, onnx_path=None,batch_size=1, input_size=0, experimental_float16_onnx=False, experimental_model_zoo_to_onnx=False):
     assert saved_model_path != None
     assert onnx_path != None
 
@@ -25,14 +25,20 @@ def main(saved_model_path=None, onnx_path=None,batch_size=1, input_size=0, exper
     if experimental_float16_onnx:
         onnx_model = convert_float_to_float16(onnx_model)
         print("Onnx model converted to float16")
+    
     graph = gs.import_onnx(onnx_model)
     assert graph
     print("ONNX graph created successfully")
     
-    # Set the I/O tensor shapes
-    graph.inputs[0].shape[0] = batch_size
-    graph.outputs[3].shape = [1, 100, 91]
+    if experimental_model_zoo_to_onnx:
+        for inp in graph.inputs:
+            inp.dtype = np.float32
+        print("Experimental: Model zoo to onnx conversion is Done ...")
     
+
+    # Set the I/O tensor shapes
+    #graph.inputs[0].shape[0] = batch_size
+    #graph.outputs[0].shape[0] = batch_size
 
     if input_size > 0:
         if graph.inputs[0].shape[3] == 3:
@@ -75,6 +81,6 @@ def main(saved_model_path=None, onnx_path=None,batch_size=1, input_size=0, exper
 
 
 if __name__ == "__main__":
-    saved_model_path = "/home/gorkem/Downloads/Compressed/ssd_mobilenet_v2_320x320_coco17_tpu-8/saved_model"
-    onnx_path = "/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/models/efficientnet_d0_float16.onnx"
-    main(saved_model_path, onnx_path=onnx_path, batch_size=1, input_size=224, experimental_float16_onnx=False)
+    saved_model_path = "/home/gorkem/Downloads/Compressed/centernet_resnet50_v2_512x512_kpts_coco17_tpu-8/saved_model"
+    onnx_path = "/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/models/centernet.onnx"
+    main(saved_model_path, onnx_path=onnx_path, batch_size=1, input_size=512, experimental_float16_onnx=False, experimental_model_zoo_to_onnx=True)
