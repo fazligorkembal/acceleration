@@ -8,11 +8,86 @@ import tensorrt as trt
 import pycuda.driver as cuda
 import pycuda.autoinit
 
+from image_batcher import ImageBatcher
 
 logging.basicConfig(level=logging.INFO)
 logging.getLogger("EngineBuilder").setLevel(logging.INFO)
 log = logging.getLogger("EngineBuilder")
 
+class EngineCalibrator(trt.IInt8EntropyCalibrator2):
+    """
+    Implements the INT8 Entropy Calibrator 2.
+    """
+
+    def __init__(self, cache_file):
+        """
+        :param cache_file: The location of the cache file.
+        """
+        super().__init__()
+        self.cache_file = cache_file
+        self.image_batcher = None
+        self.batch_allocation = None
+        self.batch_generator = None
+
+    def set_image_batcher(self, image_batcher: ImageBatcher):
+        """
+        Define the image batcher to use, if any. If using only the cache file, an image batcher doesn't need
+        to be defined.
+        :param image_batcher: The ImageBatcher object
+        """
+        self.image_batcher = image_batcher
+        size = int(np.dtype(self.image_batcher.dtype).itemsize * np.prod(self.image_batcher.shape))
+        self.batch_allocation = cuda.mem_alloc(size)
+        self.batch_generator = self.image_batcher.get_batch()
+
+    def get_batch_size(self):
+        """
+        Overrides from trt.IInt8EntropyCalibrator2.
+        Get the batch size to use for calibration.
+        :return: Batch size.
+        """
+        if self.image_batcher:
+            return self.image_batcher.batch_size
+        return 1
+
+    def get_batch(self, names):
+        """
+        Overrides from trt.IInt8EntropyCalibrator2.
+        Get the next batch to use for calibration, as a list of device memory pointers.
+        :param names: The names of the inputs, if useful to define the order of inputs.
+        :return: A list of int-casted memory pointers.
+        """
+        if not self.image_batcher:
+            return None
+        try:
+            batch, _ = next(self.batch_generator)
+            log.info("Calibrating image {} / {}".format(self.image_batcher.image_index, self.image_batcher.num_images))
+            cuda.memcpy_htod(self.batch_allocation, np.ascontiguousarray(batch))
+            return [int(self.batch_allocation)]
+        except StopIteration:
+            log.info("Finished calibration batches")
+            return None
+
+    def read_calibration_cache(self):
+        """
+        Overrides from trt.IInt8EntropyCalibrator2.
+        Read the calibration cache file stored on disk, if it exists.
+        :return: The contents of the cache file, if any.
+        """
+        if os.path.exists(self.cache_file):
+            with open(self.cache_file, "rb") as f:
+                log.info("Using calibration cache file: {}".format(self.cache_file))
+                return f.read()
+
+    def write_calibration_cache(self, cache):
+        """
+        Overrides from trt.IInt8EntropyCalibrator2.
+        Store the calibration cache to a file on disk.
+        :param cache: The contents of the calibration cache to store.
+        """
+        with open(self.cache_file, "wb") as f:
+            log.info("Writing calibration cache data to: {}".format(self.cache_file))
+            f.write(cache)
 
 class EngineBuilder:
     def __init__(self, verbose=False):
@@ -58,6 +133,8 @@ class EngineBuilder:
             print(output.name, output.dtype, output.shape)
         assert self.batch_size > 0
         self.builder.max_batch_size = self.batch_size
+    
+    
     def create_engine(self, engine_path, precision, calib_input=None, calib_cache=None, calib_num_images=25000,
                       calib_batch_size=8, calib_preprocessor=None):
         """
@@ -83,15 +160,24 @@ class EngineBuilder:
             else:
                 self.config.set_flag(trt.BuilderFlag.FP16)
         elif precision == "int8":
-            self.config.set_flag(trt.BuilderFlag.INT8)
-            sys.exit("INT8 not supported yet")
-        with self.builder.build_engine(self.network, self.config) as f:
-            log.info("Serializing Engine to {}".format(engine_path))
-            
+            print("Trying to convert model to int8 model ... ")
+            if not self.builder.platform_has_fast_int8:
+                log.warning("Platform does not support fast int8")
+            else:
+                self.config.set_flag(trt.BuilderFlag.INT8)
+                self.config.int8_calibrator = EngineCalibrator(calib_cache)
+                if not os.path.exists(calib_cache):
+                    calib_shape = [calib_batch_size] + list(inputs[0].shape[1:])
+                    calib_dtype = trt.nptype(inputs[0].dtype)
+                    self.config.int8_calibrator.set_image_batcher(
+                        ImageBatcher(calib_input, calib_shape, calib_dtype, max_num_images=calib_num_images,
+                                     exact_batches=True, preprocessor=calib_preprocessor)
+                    )            
+            print("Converting to int8 Engine is done ... ")
         with self.builder.build_engine(self.network, self.config) as engine, open(engine_path, "wb") as f:
             log.info("Serializing engine to file: {:}".format(engine_path))
             f.write(engine.serialize())
-
+            
 
 def main(verbose, onnx, engine_path, precision_type):
     """
@@ -107,8 +193,13 @@ def main(verbose, onnx, engine_path, precision_type):
     
     
     builder = EngineBuilder(verbose=verbose)
+    
     builder.create_network(onnx)
-    builder.create_engine(engine_path, precision_type)
+    builder.create_engine(engine_path, precision_type, calib_input="/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/images",
+                          calib_num_images=8,
+                          calib_batch_size=8,
+                          calib_cache="/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/calib_cache/mobilenet_onnx_f32_engine_int8.cache",
+                          calib_preprocessor="V2")
 
 
 
@@ -116,9 +207,10 @@ def main(verbose, onnx, engine_path, precision_type):
 
 if __name__ == "__main__":
     verbose=True
-    onnx_path = "/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/models/centernet.onnx"
-    engine_path = onnx_path.replace(".onnx", ".plan")
-    precision_type = "fp16"
+    onnx_path = "/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/models/mobilenet_onnx_float32.onnx"
+    precision_type = "int8"
+    engine_path = onnx_path.replace(".onnx","_engine_" + precision_type + ".plan")
+    
 
     main(verbose, onnx_path, engine_path, precision_type)
 

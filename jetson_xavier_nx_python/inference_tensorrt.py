@@ -85,12 +85,13 @@ def main(engine_path, input, preprocess_input, separator, top):
             for i in range(100000):
                 if top == 1:
                     classes, scores, tops = trt_infer.infer(batch)
+                    print(classes, scores, tops)
                 pbar.update(1)
 
 
 if __name__ == "__main__":
-    engine_path = "/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/models/mobilenet.plan"
-    image_path = "/home/gorkem/Documents/acceleration/tf_tft_env/lazy.jpg"
+    engine_path = "/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/models/mobilenet_onnx_float32_engine_int8.plan"
+    image_path = "/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/images/l1.jpg"
     top = 1
     seperator = "\t"
     preprocessor = "V2"

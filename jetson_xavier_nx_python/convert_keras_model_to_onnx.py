@@ -54,7 +54,7 @@ def main(saved_model_path=None, onnx_path=None,batch_size=1, input_size=0, exper
     #TEST FOR THIS PART ... FOR FLOAT32 and FLOAT16
     for node in [n for n in graph.nodes if n.op =="Clip"]:
         for input in node.inputs[1:]:
-            #input.values = np.float32(input.values)
+            input.values = np.float32(input.values)
             None
     graph.cleanup().toposort()
     model = shape_inference.infer_shapes(gs.export_onnx(graph))
@@ -72,5 +72,5 @@ def main(saved_model_path=None, onnx_path=None,batch_size=1, input_size=0, exper
 
 if __name__ == "__main__":
     saved_model_path = "/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/models/mobilenet"
-    onnx_path = "/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/models/mobilenet_float16.onnx"
-    main(saved_model_path, onnx_path=onnx_path, batch_size=1, input_size=224, experimental_float16_onnx=True)
+    onnx_path = "/home/gorkem/Documents/acceleration/jetson_xavier_nx_python/models/mobilenet_onnx_float32.onnx"
+    main(saved_model_path, onnx_path=onnx_path, batch_size=1, input_size=224, experimental_float16_onnx=False)
